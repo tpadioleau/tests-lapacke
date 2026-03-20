@@ -52,6 +52,12 @@ endif()
 include(CheckFunctionExists)
 include(FindPackageHandleStandardArgs)
 
+# Early exit: if a previous call already succeeded, do not redo all the work.
+# LAPACKE_FOUND is cached by find_package_handle_standard_args on success.
+if(LAPACKE_FOUND)
+    return()
+endif()
+
 # ---------------------------------------------------------------------------
 # Internal helper: look for lapacke.h relative to a given library path.
 #
@@ -123,14 +129,13 @@ find_package(LAPACK QUIET)
 set(_lapacke_bundled FALSE)
 
 if(LAPACK_FOUND)
-    # Save/restore CMAKE_REQUIRED_* to avoid polluting the caller's state.
+    # Save/restore CMAKE_REQUIRED_LIBRARIES to avoid polluting the caller's state.
+    # Only LAPACK_LIBRARIES is needed: a correctly built shared library encodes
+    # its BLAS dependency as a DT_NEEDED entry, so the dynamic linker resolves
+    # it without an explicit -lblas flag. Passing BLAS_LIBRARIES here would mask
+    # a liblapack with missing DT_NEEDED entries.
     set(_saved_req_libs "${CMAKE_REQUIRED_LIBRARIES}")
     set(CMAKE_REQUIRED_LIBRARIES ${LAPACK_LIBRARIES})
-
-    # LAPACK_LIBRARIES may already contain the BLAS libraries; if not, add them.
-    if(BLAS_LIBRARIES)
-        list(APPEND CMAKE_REQUIRED_LIBRARIES ${BLAS_LIBRARIES})
-    endif()
 
     # LAPACKE_dgetrf (LU factorisation) is a fundamental routine present in
     # every complete LAPACKE implementation and a reliable probe symbol.
@@ -160,8 +165,12 @@ if(NOT _lapacke_bundled)
 
     if(LAPACKE_LIBRARY)
         # Verify the symbols are really there (guards against empty stub libs).
+        # Only liblapacke itself is needed: a correctly built shared library
+        # encodes its LAPACK/BLAS dependencies as DT_NEEDED entries, so the
+        # dynamic linker resolves them without explicit -llapack/-lblas flags.
+        # Passing them here would mask a liblapacke with missing DT_NEEDED.
         set(_saved_req_libs "${CMAKE_REQUIRED_LIBRARIES}")
-        set(CMAKE_REQUIRED_LIBRARIES "${LAPACKE_LIBRARY};${LAPACK_LIBRARIES};${BLAS_LIBRARIES}")
+        set(CMAKE_REQUIRED_LIBRARIES "${LAPACKE_LIBRARY}")
         check_function_exists(LAPACKE_dgetrf _lapacke_standalone_check)
         set(CMAKE_REQUIRED_LIBRARIES "${_saved_req_libs}")
 
