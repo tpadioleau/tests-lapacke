@@ -161,7 +161,7 @@ jobs:
           # any explicit LAPACKE_ROOT hint.
           - scenario:       spack-openblas
             os:             ubuntu-22.04
-            packages:       ""
+            packages:       libopenblas-dev liblapacke-dev
             spack_spec:     openblas
             cmake_args:     ""
             expect_found:   true
@@ -173,7 +173,7 @@ jobs:
           # from the same Spack prefix via CMAKE_PREFIX_PATH.
           - scenario:       spack-netlib-lapacke
             os:             ubuntu-22.04
-            packages:       ""
+            packages:       libopenblas-dev liblapacke-dev
             spack_spec:     "netlib-lapack+lapacke"
             cmake_args:     ""
             expect_found:   true
