@@ -84,49 +84,35 @@ jobs:
       matrix:
         include:
 
-          # ── OpenBLAS bundled, auto-detected ────────────────────────────
-          - scenario:       openblas-bundled-auto
+          # ── Standalone liblapacke (openblas) ────────────────────────────
+          - scenario:       openblas-lapacke
             os:             ubuntu-22.04
             packages:       libopenblas-dev liblapacke-dev
             cmake_args:     ""
             expect_found:   true
             cmake_version:  "3.25"
 
-          - scenario:       openblas-bundled-auto
+          # ── Standalone liblapacke (atlas) ────────────────────────────
+          - scenario:       atlas-lapacke
             os:             ubuntu-22.04
-            packages:       libopenblas-dev liblapacke-dev
+            packages:       libatlas-base-dev liblapacke-dev
             cmake_args:     ""
-            expect_found:   true
-            cmake_version:  "latest"
-
-          # ── OpenBLAS with explicit BLA_VENDOR ──────────────────────────
-          - scenario:       openblas-explicit-vendor
-            os:             ubuntu-22.04
-            packages:       libopenblas-dev liblapacke-dev
-            cmake_args:     "-DBLA_VENDOR=OpenBLAS"
             expect_found:   true
             cmake_version:  "3.25"
 
-          - scenario:       openblas-explicit-vendor
-            os:             ubuntu-22.04
-            packages:       libopenblas-dev liblapacke-dev
-            cmake_args:     "-DBLA_VENDOR=OpenBLAS"
-            expect_found:   true
-            cmake_version:  "latest"
-
-          # ── Standalone liblapacke (reference LAPACK) ───────────────────
-          - scenario:       standalone-liblapacke
+          # ── Standalone liblapacke (netlib) ───────────────────
+          - scenario:       netlib-lapacke
             os:             ubuntu-22.04
             packages:       liblapack-dev liblapacke-dev
             cmake_args:     ""
             expect_found:   true
             cmake_version:  "3.25"
 
-          # ── LAPACKE_ROOT pointing to the system prefix ─────────────────
-          - scenario:       custom-prefix
-            os:             ubuntu-22.04
+          # ── Standalone liblapacke (openblas) ────────────────────────────
+          - scenario:       openblas-lapacke
+            os:             ubuntu-22.04-arm
             packages:       libopenblas-dev liblapacke-dev
-            cmake_args:     "-DLAPACKE_ROOT=/usr"
+            cmake_args:     ""
             expect_found:   true
             cmake_version:  "3.25"
 
@@ -185,6 +171,18 @@ jobs:
           # any explicit LAPACKE_ROOT hint.
           - scenario:       spack-openblas
             os:             ubuntu-22.04
+            packages:       ""
+            spack_spec:     "openblas"
+            cmake_args:     ""
+            expect_found:   true
+            cmake_version:  "3.25"
+
+          # ── Spack / OpenBLAS (bundled LAPACKE) ────────────────────────
+          # spack load populates CMAKE_PREFIX_PATH with the OpenBLAS prefix,
+          # which CMake uses to find both the library and lapacke.h without
+          # any explicit LAPACKE_ROOT hint.
+          - scenario:       spack-openblas
+            os:             ubuntu-22.04-arm
             packages:       ""
             spack_spec:     "openblas"
             cmake_args:     ""
