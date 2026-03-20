@@ -1,0 +1,204 @@
+name: FindLAPACKE
+
+on:
+  push:
+    paths:
+      - "FindLAPACKE.cmake"
+      - "tests/**"
+      - ".github/workflows/findlapacke.yml"
+  pull_request:
+    paths:
+      - "FindLAPACKE.cmake"
+      - "tests/**"
+      - ".github/workflows/findlapacke.yml"
+  workflow_dispatch:
+
+# ---------------------------------------------------------------------------
+# Matrix design
+#
+# Each entry exercises a distinct code path in FindLAPACKE.cmake:
+#
+#  openblas-bundled-auto     Ubuntu / libopenblas-dev, no vendor hint.
+#                            Tests the bundled-symbol probe on a provider
+#                            that does not ship a separate liblapacke.
+#
+#  openblas-explicit-vendor  Same packages but BLA_VENDOR=OpenBLAS.
+#                            Verifies that an explicit vendor hint still
+#                            reaches the bundled-symbol branch.
+#
+#  standalone-liblapacke     Ubuntu / reference LAPACK + liblapacke-dev.
+#                            The bundled probe fails; the fallback finds
+#                            the independent liblapacke.so.
+#
+#  custom-prefix             Ubuntu / libopenblas-dev installed system-wide,
+#                            but LAPACKE_ROOT=/usr forces the header and
+#                            library search through the hint path.
+#
+#  not-found                 Only liblapack-dev (no LAPACKE). The module
+#                            must report LAPACKE_FOUND=FALSE without error.
+#                            EXPECT_FOUND=OFF makes the test CMakeLists.txt
+#                            assert this and fail configure if the module
+#                            incorrectly claims success.
+#
+#  not-found-required        Same absent LAPACKE but find_package(REQUIRED).
+#                            Configure must exit non-zero; the step uses
+#                            continue-on-error and the next step asserts
+#                            the failure.
+#
+#  macos-homebrew            macOS / Homebrew OpenBLAS. LAPACKE_ROOT is set
+#                            at runtime from `brew --prefix openblas` because
+#                            Homebrew prefixes differ between Intel and ARM.
+#
+# cmake_version axis: the module minimum (3.25) is applied to every scenario;
+# the latest released CMake is applied only to the two highest-value scenarios
+# to keep the total job count manageable.
+# ---------------------------------------------------------------------------
+
+jobs:
+  test:
+    name: "${{ matrix.scenario }} / CMake ${{ matrix.cmake_version }}"
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.expect_configure_failure == true }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+
+          # ── Standalone liblapacke (OpenBLAS), auto-detected ────────────────────────────
+          - scenario:       openblas-bundled-auto
+            os:             ubuntu-22.04
+            packages:       libopenblas-dev liblapacke-dev
+            cmake_args:     ""
+            expect_found:   true
+            cmake_version:  "3.25"
+
+          - scenario:       openblas-bundled-auto
+            os:             ubuntu-22.04
+            packages:       libopenblas-dev liblapacke-dev
+            cmake_args:     ""
+            expect_found:   true
+            cmake_version:  "latest"
+
+          # ── Standalone liblapacke (OpenBLAS) with explicit BLA_VENDOR ──────────────────────────
+          - scenario:       openblas-explicit-vendor
+            os:             ubuntu-22.04
+            packages:       libopenblas-dev liblapacke-dev
+            cmake_args:     "-DBLA_VENDOR=OpenBLAS"
+            expect_found:   true
+            cmake_version:  "3.25"
+
+          - scenario:       openblas-explicit-vendor
+            os:             ubuntu-22.04
+            packages:       libopenblas-dev liblapacke-dev
+            cmake_args:     "-DBLA_VENDOR=OpenBLAS"
+            expect_found:   true
+            cmake_version:  "latest"
+
+          # ── Standalone liblapacke (netlib) ───────────────────
+          - scenario:       standalone-liblapacke
+            os:             ubuntu-22.04
+            packages:       liblapack-dev liblapacke-dev
+            cmake_args:     ""
+            expect_found:   true
+            cmake_version:  "3.25"
+
+          # ── LAPACKE_ROOT pointing to the system prefix ─────────────────
+          - scenario:       custom-prefix
+            os:             ubuntu-22.04
+            packages:       libopenblas-dev liblapacke-dev
+            cmake_args:     "-DLAPACKE_ROOT=/usr"
+            expect_found:   true
+            cmake_version:  "3.25"
+
+          # ── LAPACKE absent, non-REQUIRED ───────────────────────────────
+          - scenario:       not-found
+            os:             ubuntu-22.04
+            packages:       liblapack-dev
+            cmake_args:     "-DEXPECT_FOUND=OFF"
+            expect_found:   false
+            cmake_version:  "3.25"
+
+          # ── LAPACKE absent, REQUIRED → configure must fail ─────────────
+          - scenario:           not-found-required
+            os:                 ubuntu-22.04
+            packages:           liblapack-dev
+            cmake_args:         "-DLAPACKE_REQUIRED=ON"
+            expect_found:       false
+            expect_configure_failure: true
+            cmake_version:      "3.25"
+
+          # ── macOS / Homebrew OpenBLAS ──────────────────────────────────
+          - scenario:       macos-homebrew
+            os:             macos-14
+            packages:       openblas
+            cmake_args:     ""          # LAPACKE_ROOT added dynamically below
+            expect_found:   true
+            cmake_version:  "3.25"
+
+    # -----------------------------------------------------------------------
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up CMake ${{ matrix.cmake_version }}
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: ${{ matrix.cmake_version }}
+
+      # -- Install dependencies --------------------------------------------
+
+      - name: Install packages (Ubuntu)
+        if: runner.os == 'Linux' && matrix.packages != ''
+        run: sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Install packages (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ${{ matrix.packages }}
+
+      # LAPACKE_ROOT must reflect the actual Homebrew prefix, which differs
+      # between Intel (/usr/local) and Apple Silicon (/opt/homebrew) runners.
+      - name: Resolve Homebrew LAPACKE_ROOT (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "BREW_LAPACKE_ROOT=$(brew --prefix openblas)" >> "$GITHUB_ENV"
+
+      # -- Configure -------------------------------------------------------
+
+      - name: Configure (expect success)
+        if: "!matrix.expect_configure_failure"
+        run: >
+          cmake -S tests -B build
+          -DCMAKE_MODULE_PATH="${{ github.workspace }}"
+          ${{ matrix.cmake_args }}
+          ${{ env.BREW_LAPACKE_ROOT && format('-DLAPACKE_ROOT={0}', env.BREW_LAPACKE_ROOT) || '' }}
+
+      # A separate step with id so we can inspect its outcome.
+      - name: Configure (expect failure)
+        if: matrix.expect_configure_failure
+        id: configure_expect_fail
+        continue-on-error: true
+        run: >
+          cmake -S tests -B build
+          -DCMAKE_MODULE_PATH="${{ github.workspace }}"
+          ${{ matrix.cmake_args }}
+
+      - name: Assert configure did fail
+        if: matrix.expect_configure_failure
+        run: |
+          if [ "${{ steps.configure_expect_fail.outcome }}" != "failure" ]; then
+            echo "::error::Configure was expected to fail (LAPACKE REQUIRED + absent)" \
+                 "but it succeeded."
+            exit 1
+          fi
+          echo "Configure correctly rejected missing REQUIRED LAPACKE."
+
+      # -- Build & run -----------------------------------------------------
+
+      - name: Build
+        if: "!matrix.expect_configure_failure && matrix.expect_found"
+        run: cmake --build build --parallel
+
+      - name: Run test binary
+        if: "!matrix.expect_configure_failure && matrix.expect_found"
+        run: ./build/test_lapacke
