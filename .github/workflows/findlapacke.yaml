@@ -34,13 +34,14 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   test-ubuntu:
-    name: "ubuntu / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "ubuntu / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
     runs-on: ${{matrix.os}}
     continue-on-error: ${{matrix.scenarios.expect_configure_failure == true}}
 
     strategy:
       fail-fast: false
       matrix:
+        version: [old, new]
         os:
           - ubuntu-22.04
           - ubuntu-24.04
@@ -70,7 +71,7 @@ jobs:
         continue-on-error: ${{matrix.scenarios.expect_configure_failure}}
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}"
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
           ${{matrix.scenarios.cmake_args}}
 
       - name: Assert configure did fail
@@ -92,12 +93,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   test-macos:
-    name: "macos / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "macos / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
     runs-on: ${{matrix.os}}
 
     strategy:
       fail-fast: false
       matrix:
+        version: [old, new]
         os:
           - macos-14
           - macos-15
@@ -126,7 +128,7 @@ jobs:
       - name: Configure
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}"
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
           -DLAPACKE_ROOT="${{env.LAPACKE_ROOT}}"
           ${{matrix.scenarios.cmake_args}}
 
@@ -138,12 +140,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   test-spack:
-    name: "spack / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "spack / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
     runs-on: ${{matrix.os}}
 
     strategy:
       fail-fast: false
       matrix:
+        version: [old, new]
         os:
           - ubuntu-24.04
           - ubuntu-24.04-arm
@@ -191,7 +194,7 @@ jobs:
       - name: Configure
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}"
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
           ${{matrix.scenarios.cmake_args}}
 
       - name: Build
