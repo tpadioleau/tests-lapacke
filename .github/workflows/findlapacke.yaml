@@ -34,34 +34,28 @@ jobs:
       matrix:
         version: [old, new]
         os:
-          - ubuntu-22.04
           - ubuntu-24.04
-          - ubuntu-22.04-arm
           - ubuntu-24.04-arm
         configuration:
           - name: openblas
-            packages: libopenblas-dev liblapacke-dev
+            packages: cmake libopenblas-dev liblapacke-dev
             expect_configure_failure: false
           - name: atlas
-            packages: libatlas-base-dev liblapacke-dev
+            packages: cmake libatlas-base-dev liblapacke-dev
             expect_configure_failure: false
           - name: netlib
-            packages: liblapack-dev liblapacke-dev
+            packages: cmake liblapack-dev liblapacke-dev
             expect_configure_failure: false
           - name: empty
-            packages: liblapack-dev
+            packages: cmake liblapack-dev
             expect_configure_failure: true
     steps:
       - uses: actions/checkout@v6
 
-      - uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "latest"
-
       - name: Install packages
         run: sudo apt-get install -y ${{matrix.configuration.packages}}
 
-      - name: Configure (expect failure)
+      - name: Configure
         id: configuration
         continue-on-error: ${{matrix.configuration.expect_configure_failure}}
         run: >
@@ -103,18 +97,14 @@ jobs:
           - macos-26-intel
         configuration:
           - name: openblas
-            packages: openblas
+            packages: cmake openblas
             expect_configure_failure: false
           - name: netlib
-            packages: lapack
+            packages: cmake lapack
             expect_configure_failure: false
 
     steps:
       - uses: actions/checkout@v6
-
-      - uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "latest"
 
       - name: Install packages
         run: brew install ${{matrix.configuration.packages}}
@@ -145,22 +135,20 @@ jobs:
       matrix:
         version: [old, new]
         os:
+          - macos-15
+          - macos-26
           - ubuntu-24.04
           - ubuntu-24.04-arm
         configuration:
           - name: openblas
-            packages: openblas
+            packages: cmake openblas
             expect_configure_failure: false
           - name: netlib
-            packages: "netlib-lapack+lapacke"
+            packages: "cmake netlib-lapack+lapacke"
             expect_configure_failure: false
 
     steps:
       - uses: actions/checkout@v6
-
-      - uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "latest"
 
       - name: Clone Spack
         uses: actions/checkout@v6
