@@ -34,9 +34,9 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   test-ubuntu:
-    name: "ubuntu / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "${{matrix.version}} / ${{matrix.os}} / ${{matrix.configuration.name}}"
     runs-on: ${{matrix.os}}
-    continue-on-error: ${{matrix.scenarios.expect_configure_failure == true}}
+    continue-on-error: ${{matrix.configuration.expect_configure_failure == true}}
 
     strategy:
       fail-fast: false
@@ -47,14 +47,18 @@ jobs:
           - ubuntu-24.04
           - ubuntu-22.04-arm
           - ubuntu-24.04-arm
-        scenarios:
-          - packages: libopenblas-dev liblapacke-dev
+        configuration:
+          - name: openblas
+            packages: libopenblas-dev liblapacke-dev
             expect_configure_failure: false
-          - packages: libatlas-base-dev liblapacke-dev
+          - name: atlas
+            packages: libatlas-base-dev liblapacke-dev
             expect_configure_failure: false
-          - packages: liblapack-dev liblapacke-dev
+          - name: netlib
+            packages: liblapack-dev liblapacke-dev
             expect_configure_failure: false
-          - packages: liblapack-dev
+          - name: empty
+            packages: liblapack-dev
             expect_configure_failure: true
     steps:
       - uses: actions/checkout@v6
@@ -64,18 +68,18 @@ jobs:
           cmake-version: "latest"
 
       - name: Install packages
-        run: sudo apt-get install -y ${{matrix.scenarios.packages}}
+        run: sudo apt-get install -y ${{matrix.configuration.packages}}
 
       - name: Configure (expect failure)
         id: configuration
-        continue-on-error: ${{matrix.scenarios.expect_configure_failure}}
+        continue-on-error: ${{matrix.configuration.expect_configure_failure}}
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
-          ${{matrix.scenarios.cmake_args}}
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
+          ${{matrix.configuration.cmake_args}}
 
       - name: Assert configure did fail
-        if: matrix.scenarios.expect_configure_failure
+        if: matrix.configuration.expect_configure_failure
         run: |
           if [ "${{steps.configuration.outcome}}" != "failure" ]; then
             echo "::error::Configure was expected to fail (LAPACKE REQUIRED + absent) but succeeded."
@@ -84,16 +88,16 @@ jobs:
           echo "Configure correctly rejected missing REQUIRED LAPACKE."
 
       - name: Build
-        if: ${{matrix.scenarios.expect_configure_failure == false}}
+        if: ${{matrix.configuration.expect_configure_failure == false}}
         run: cmake --build build --parallel
 
       - name: Run test binary
-        if: ${{matrix.scenarios.expect_configure_failure == false}}
+        if: ${{matrix.configuration.expect_configure_failure == false}}
         run: ./build/test_lapacke
 
   # ─────────────────────────────────────────────────────────────────────────
   test-macos:
-    name: "macos / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "${{matrix.version}} / ${{matrix.os}} / ${{matrix.configuration.name}}"
     runs-on: ${{matrix.os}}
 
     strategy:
@@ -106,10 +110,12 @@ jobs:
           - macos-26
           - macos-15-intel
           - macos-26-intel
-        scenarios:
-          - packages: openblas
+        configuration:
+          - name: openblas
+            packages: openblas
             expect_configure_failure: false
-          - packages: lapack
+          - name: netlib
+            packages: lapack
             expect_configure_failure: false
 
     steps:
@@ -120,17 +126,17 @@ jobs:
           cmake-version: "latest"
 
       - name: Install packages
-        run: brew install ${{matrix.scenarios.packages}}
+        run: brew install ${{matrix.configuration.packages}}
 
       - name: Resolve LAPACKE_ROOT from Homebrew prefix
-        run: echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.scenarios.packages}})" >> "$GITHUB_ENV"
+        run: echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.packages}})" >> "$GITHUB_ENV"
 
       - name: Configure
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
           -DLAPACKE_ROOT="${{env.LAPACKE_ROOT}}"
-          ${{matrix.scenarios.cmake_args}}
+          ${{matrix.configuration.cmake_args}}
 
       - name: Build
         run: cmake --build build --parallel
@@ -140,7 +146,7 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   test-spack:
-    name: "spack / ${{matrix.version}} / ${{matrix.os}} / ${{matrix.scenarios.packages}}"
+    name: "${{matrix.version}} / spack-${{matrix.os}} / ${{matrix.configuration.name}}"
     runs-on: ${{matrix.os}}
 
     strategy:
@@ -150,10 +156,12 @@ jobs:
         os:
           - ubuntu-24.04
           - ubuntu-24.04-arm
-        scenarios:
-          - packages: openblas
+        configuration:
+          - name: openblas
+            packages: openblas
             expect_configure_failure: false
-          - packages: "netlib-lapack+lapacke"
+          - name: netlib
+            packages: "netlib-lapack+lapacke"
             expect_configure_failure: false
 
     steps:
@@ -179,14 +187,14 @@ jobs:
       - name: Install Spack packages
         run: |
           . spack/share/spack/setup-env.sh
-          spack install --fresh --no-check-signature ${{matrix.scenarios.packages}}
+          spack install --fresh --no-check-signature ${{matrix.configuration.packages}}
 
       # spack load sets CMAKE_PREFIX_PATH (and PATH, LD_LIBRARY_PATH, …).
       # Forward the CMake-relevant variables to subsequent steps via GITHUB_ENV.
       - name: Load Spack packages into environment
         run: |
           . spack/share/spack/setup-env.sh
-          spack load ${{matrix.scenarios.packages}}
+          spack load ${{matrix.configuration.packages}}
           for var in CMAKE_PREFIX_PATH PATH LD_LIBRARY_PATH PKG_CONFIG_PATH; do
             [ -n "${!var}" ] && echo "${var}=${!var}" >> "$GITHUB_ENV"
           done
@@ -194,8 +202,8 @@ jobs:
       - name: Configure
         run: >
           cmake -S tests -B build
-          -DCMAKE_MODULE_PATH="${{github.workspace}}/${{matrix.version}}"
-          ${{matrix.scenarios.cmake_args}}
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
+          ${{matrix.configuration.cmake_args}}
 
       - name: Build
         run: cmake --build build --parallel
