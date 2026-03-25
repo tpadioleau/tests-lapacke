@@ -109,8 +109,8 @@ jobs:
       - name: Install packages
         run: brew install ${{matrix.configuration.packages}}
 
-      - name: Resolve LAPACKE_ROOT from Homebrew prefix
-        run: echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.packages}})" >> "$GITHUB_ENV"
+      # - name: Resolve LAPACKE_ROOT from Homebrew prefix
+      #   run: echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.packages}})" >> "$GITHUB_ENV"
 
       - name: Configure
         run: >
