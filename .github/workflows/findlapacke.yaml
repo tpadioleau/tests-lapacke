@@ -43,7 +43,7 @@ jobs:
           - name: atlas
             packages: cmake libatlas-base-dev liblapacke-dev
             expect_configure_failure: false
-          - name: netlib
+          - name: lapack
             packages: cmake liblapack-dev liblapacke-dev
             expect_configure_failure: false
           - name: empty
@@ -99,7 +99,7 @@ jobs:
           - name: openblas
             packages: cmake openblas
             expect_configure_failure: false
-          - name: netlib
+          - name: lapack
             packages: cmake lapack
             expect_configure_failure: false
 
@@ -109,14 +109,18 @@ jobs:
       - name: Install packages
         run: brew install ${{matrix.configuration.packages}}
 
-      # - name: Resolve LAPACKE_ROOT from Homebrew prefix
-      #   run: echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.packages}})" >> "$GITHUB_ENV"
+      - name: Resolve LAPACKE_ROOT from Homebrew prefix
+        run: |
+          if [ "${{matrix.version}}" == "new" ]; then
+            echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.name}})" >> "$GITHUB_ENV"
+          else
+            echo "LAPACKE_DIR=$(brew --prefix ${{matrix.configuration.name}})" >> "$GITHUB_ENV"
+          endif
 
       - name: Configure
         run: >
           cmake -S tests -B build
           -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
-          -DLAPACKE_ROOT="${{env.LAPACKE_ROOT}}"
           ${{matrix.configuration.cmake_args}}
 
       - name: Build
@@ -143,7 +147,7 @@ jobs:
           - name: openblas
             packages: cmake openblas
             expect_configure_failure: false
-          - name: netlib
+          - name: lapack
             packages: "cmake netlib-lapack+lapacke"
             expect_configure_failure: false
 
