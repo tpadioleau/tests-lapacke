@@ -224,7 +224,7 @@ jobs:
         with:
           repository: spack/spack
           # Pin to a stable release branch for reproducibility.
-          ref:        releases/v0.22
+          ref:        releases/v1.1.1
           path:       spack
 
       # Cache the Spack install tree between runs. The key includes the spec
