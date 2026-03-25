@@ -59,63 +59,6 @@ include(CheckFunctionExists)
 include(FindPackageHandleStandardArgs)
 
 # ---------------------------------------------------------------------------
-# Internal helper: look for lapacke.h relative to a given library path.
-#
-# Usage:  _lapacke_find_header_near_lib(<lib_path> <out_var>)
-#
-# Sets <out_var> in the caller's scope to the directory containing lapacke.h,
-# or leaves it unset when the header cannot be found.
-#
-# find_path is used with NO_DEFAULT_PATH so the search is strictly anchored to
-# the prefix that owns the library; system-wide include directories are not
-# considered here (the top-level find_path call handles those).
-# The result variable is unset from the cache after each call so that repeated
-# invocations for different libraries are not short-circuited by a cached hit.
-# ---------------------------------------------------------------------------
-function(_lapacke_find_header_near_lib lib_path out_var)
-    if(NOT lib_path)
-        return()
-    endif()
-
-    # Resolve symlinks so we always work with the real filesystem layout.
-    get_filename_component(_lib_real "${lib_path}" REALPATH)
-    get_filename_component(_lib_dir  "${_lib_real}" DIRECTORY)
-
-    # Build the set of prefix roots to search under:
-    #   <prefix>/lib/              ->  <prefix>/          (standard)
-    #   <prefix>/lib64/            ->  <prefix>/          (standard 64-bit)
-    #   <prefix>/lib/<arch>/       ->  <prefix>/          (multiarch, e.g. Debian)
-    #   <prefix>/lib/<arch>/       ->  <prefix>/lib/      (OpenBLAS multiarch layout)
-    #   <lib_dir> itself           ->                     (header next to .so, rare)
-    #
-    # PATH_SUFFIXES then appends the well-known include sub-directories under
-    # each root.  The empty suffix "" lets find_path test the root itself,
-    # which covers the case where <lib_dir> is already an include directory.
-    find_path(_lapacke_header_near_lib_result
-        NAMES lapacke.h
-        HINTS
-            "${_lib_dir}/.."        # lib/ or lib64/ -> prefix root
-            "${_lib_dir}/../.."     # lib/<arch>/    -> prefix root (multiarch)
-            "${_lib_dir}"           # header shipped next to the .so (rare)
-        PATH_SUFFIXES
-            include
-            include/openblas
-            include/lapacke
-            include/lapack
-            ""                      # test the hint directory itself
-        NO_DEFAULT_PATH
-        NO_CACHE
-    )
-
-    if(_lapacke_header_near_lib_result)
-        set(${out_var} "${_lapacke_header_near_lib_result}")
-    endif()
-
-    # Propagate <out_var> (set or unset) to the caller without PARENT_SCOPE.
-    return(PROPAGATE ${out_var})
-endfunction()
-
-# ---------------------------------------------------------------------------
 # Step 1 – Locate LAPACK (and its transitive BLAS dependency).
 # ---------------------------------------------------------------------------
 find_package(LAPACK QUIET)
@@ -198,30 +141,6 @@ find_path(LAPACKE_INCLUDE_DIR
     PATH_SUFFIXES include include/openblas include/lapacke include/lapack
 )
 
-if(NOT LAPACKE_INCLUDE_DIR)
-    # Derive the header location from the library path when the standard search
-    # above came up empty (common with non-system OpenBLAS installs).
-    if(_lapacke_bundled)
-        # Bundled case: probe relative to each library in LAPACK_LIBRARIES.
-        foreach(_lib IN LISTS LAPACK_LIBRARIES)
-            if(EXISTS "${_lib}")          # skip flags like "-lpthread"
-                _lapacke_find_header_near_lib("${_lib}" _lapacke_include_dir)
-                if(_lapacke_include_dir)
-                    set(LAPACKE_INCLUDE_DIR "${_lapacke_include_dir}" CACHE PATH
-                        "Directory containing lapacke.h" FORCE)
-                    break()
-                endif()
-            endif()
-        endforeach()
-    elseif(LAPACKE_LIBRARY)
-        _lapacke_find_header_near_lib("${LAPACKE_LIBRARY}" _lapacke_include_dir)
-        if(_lapacke_include_dir)
-            set(LAPACKE_INCLUDE_DIR "${_lapacke_include_dir}" CACHE PATH
-                "Directory containing lapacke.h" FORCE)
-        endif()
-    endif()
-endif()
-
 # ---------------------------------------------------------------------------
 # Step 5 – Assemble result variables.
 # ---------------------------------------------------------------------------
@@ -267,4 +186,3 @@ unset(_lapacke_bundled)
 unset(_lapacke_bundled_check)    # regular variable; CACHE entry kept for speed
 unset(_lapacke_standalone_check) # regular variable; CACHE entry kept for speed
 unset(_lapacke_include_dir)
-unset(_lib)
