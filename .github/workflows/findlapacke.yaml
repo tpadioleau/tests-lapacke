@@ -2,15 +2,6 @@ name: FindLAPACKE
 
 on:
   push:
-    paths:
-      - "FindLAPACKE.cmake"
-      - "tests/**"
-      - ".github/workflows/findlapacke.yaml"
-  pull_request:
-    paths:
-      - "FindLAPACKE.cmake"
-      - "tests/**"
-      - ".github/workflows/findlapacke.yaml"
   workflow_dispatch:
 
 # ---------------------------------------------------------------------------
