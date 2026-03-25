@@ -114,7 +114,7 @@ jobs:
             echo "LAPACKE_ROOT=$(brew --prefix ${{matrix.configuration.name}})" >> "$GITHUB_ENV"
           else
             echo "LAPACKE_DIR=$(brew --prefix ${{matrix.configuration.name}})" >> "$GITHUB_ENV"
-          endif
+          fi
 
       - name: Configure
         run: >
