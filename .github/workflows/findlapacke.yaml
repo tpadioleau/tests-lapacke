@@ -61,7 +61,6 @@ jobs:
         run: >
           cmake -S tests -B build
           -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
-          ${{matrix.configuration.cmake_args}}
 
       - name: Assert configure did fail
         if: matrix.configuration.expect_configure_failure
@@ -121,7 +120,6 @@ jobs:
         run: >
           cmake -S tests -B build
           -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
-          ${{matrix.configuration.cmake_args}}
 
       - name: Build
         run: cmake --build build --parallel
@@ -186,7 +184,6 @@ jobs:
         run: >
           cmake -S tests -B build
           -DCMAKE_MODULE_PATH="${{github.workspace}}/cmake/${{matrix.version}}"
-          ${{matrix.configuration.cmake_args}}
 
       - name: Build
         run: cmake --build build --parallel
